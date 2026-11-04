@@ -1,0 +1,14 @@
+[project]
+name = "svd-movie-recommender"
+version = "1.0.0"
+description = "Movie recommender built on a from-scratch SVD (Householder QR + QR iteration)"
+readme = "README.md"
+requires-python = ">=3.10"
+dependencies = ["numpy", "pandas", "matplotlib"]
+
+[project.optional-dependencies]
+dev = ["pytest"]
+
+[tool.pytest.ini_options]
+pythonpath = ["src"]
+testpaths = ["tests"]

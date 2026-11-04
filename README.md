@@ -1,60 +1,79 @@
-# Movie Recommendation System using SVD
+# SVD Movie Recommender
 
-This project is an implementation of a recommendation system (Collaborative Filtering) based on the **MovieLens 100k** dataset. The main feature of this project is the **from-scratch mathematical implementation of Singular Value Decomposition (SVD)**, without using the predefined SVD functions from numerical computation libraries.
+[![tests](https://github.com/AlexandruAchilleF/svd-movie-recommender/actions/workflows/tests.yml/badge.svg)](https://github.com/AlexandruAchilleF/svd-movie-recommender/actions/workflows/tests.yml)
+![Python](https://img.shields.io/badge/python-3.10%2B-blue)
 
-To obtain the SVD factorization ($A = U \Sigma V^T$), the algorithm uses **QR Factorization via Householder reflections** followed by the **QR Algorithm (Iteration)**.
+A collaborative-filtering movie recommender on the **MovieLens 100k** dataset. The
+Singular Value Decomposition is **implemented from scratch** with Householder QR
+factorization and the QR algorithm. It does not call `numpy.linalg.svd`, which is only
+used afterwards to check the result.
 
-## Key Features
+## How it works
 
-* **Matrix Factorization:** Custom implementation of the SVD algorithm to extract latent features of users and movies.
-* **Automatic Data Download:** The script automatically downloads the MovieLens 100k dataset if it is not found locally.
-* **Processing and Prediction:** Handles missing values (unseen movies) using the mean rating of each user and predicts ratings using a low-rank approximation ($k$).
-* **Recommendation System:** Analyzes a user's viewing history and recommends the most relevant movies they haven't seen yet.
-* **Mathematical Validation:** Compares the custom SVD results with the highly optimized `numpy.linalg.svd` function to demonstrate accuracy (error in the order of $10^{-14}$).
-* **Data Visualization:** Generates plots to analyze the model's performance.
+1. **Rating matrix.** Load a users × movies matrix $R$ (missing ratings are `NaN`).
+2. **Centering.** Fill each missing entry with the user's mean rating, then subtract that mean.
+3. **QR factorization.** `qr_householder` builds $A = QR$ from Householder reflections
+   $H = I - 2\frac{vv^T}{v^Tv}$.
+4. **SVD.** `svd` runs QR iteration on $A^TA$ until it is diagonal. That yields
+   $V$ and $\sigma_i = \sqrt{\lambda_i}$, and then $u_i = A v_i / \sigma_i$.
+5. **Prediction.** Keep the top $k$ components, $\hat R = U_k \Sigma_k V_k^T + \bar r_u$,
+   clipped to $[1, 5]$, and recommend the unseen movies with the highest scores.
 
-## System Requirements
+The singular values match NumPy to within about $10^{-12}$.
 
-The project runs on Python 3 and requires the following installed libraries:
+## Project structure
 
-```bash
-pip install numpy pandas matplotlib
+```
+svd-movie-recommender/
+├── main.py                    # CLI entry point: runs the full pipeline
+├── src/svd_recommender/
+│   ├── linalg.py              # norms, Householder QR, SVD (from scratch)
+│   ├── data.py                # MovieLens download and loading
+│   ├── recommender.py         # SVDRecommender: prediction, RMSE, recommendations
+│   └── plotting.py            # evaluation plots
+├── tests/                     # pytest unit tests
+└── docs/images/               # generated plots
 ```
 
-*(The `ssl`, `os`, `zipfile`, and `urllib.request` libraries are part of the standard Python library and do not require separate installation).*
-
-## How to Run
+## Getting started
 
 ```bash
-git clone https://github.com/AlexandruAchilleF/SVD-Movie-Recommender.git
-cd SVD-Movie-Recommender
-pip install numpy pandas matplotlib
+git clone https://github.com/AlexandruAchilleF/svd-movie-recommender.git
+cd svd-movie-recommender
+pip install -r requirements.txt
 python main.py
 ```
 
-If the dataset is not found locally, the script will download the `ml-100k.zip` archive from the GroupLens servers and extract the necessary data. To maintain a reasonable execution time for the custom SVD algorithm, the script automatically extracts a subset of the database (e.g., the first 100 users and 130 movies).
+On first run, the dataset is downloaded from GroupLens into `data/`, which git ignores.
+Options:
 
-## What Does the Script Output?
+```bash
+python main.py --user 5 --k 4 --top-n 5
+```
 
-Once executed, the script will provide the following results:
+Run `python main.py --help` for the full list, and `pytest` for the tests.
 
-**1. Console Output:**
-* Data download and loading status.
-* The error ($L_2$ Norm) between manually calculated singular values and those calculated by NumPy.
-* Top recommendations (movies and estimated ratings) for a test user.
-* The actual viewing history of that user to provide context for the recommendations.
+### Example output
 
-**2. Locally Saved Plots:**
-* `singular_values.png` - Shows the importance of each latent feature (the exponential decay of singular values).
-* `rmse_vs_k.png` - Analyzes how the prediction error (RMSE) decreases as we increase the number of latent features ($k$) retained in the matrix reconstruction.
+```
+L2 error of singular values vs numpy.linalg.svd: 1.2109e-12
+
+Top 3 recommendations for user 2 (k=3):
+  -> Shawshank Redemption, The (1994)  (predicted rating: 4.22 / 5)
+  -> Pulp Fiction (1994)  (predicted rating: 4.20 / 5)
+  -> Usual Suspects, The (1995)  (predicted rating: 4.16 / 5)
+```
 
 ## Results
 
-| Singular values | RMSE vs. number of latent features |
+| Singular value decay | RMSE vs number of latent features |
 | --- | --- |
-| ![Singular values](singular_values.png) | ![RMSE vs k](rmse_vs_k.png) |
+| ![Singular values](docs/images/singular_values.png) | ![RMSE vs k](docs/images/rmse_vs_k.png) |
 
-## Mathematical Structure
+The RMSE is measured on the observed (training) ratings, so it shows reconstruction
+quality rather than generalization.
 
-* `qr_householder(A)`: Applies orthogonal transformations (Householder reflections) to decompose matrix $A$ into an orthogonal matrix $Q$ and an upper triangular matrix $R$.
-* `custom_svd(A)`: Calculates the eigenvalues and eigenvectors for $A^T A$ by applying QR iterations based on the previous function, forcing symmetry at each step to avoid floating-point precision errors. It then extracts matrices $U$, $\Sigma$, and $V^T$.
+## Dataset
+
+[MovieLens 100k](https://grouplens.org/datasets/movielens/100k/) by GroupLens Research,
+University of Minnesota. It is not redistributed in this repository.
